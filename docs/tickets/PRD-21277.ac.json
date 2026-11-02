@@ -1,0 +1,119 @@
+[
+  {
+    "id": "TC1",
+    "ac": "AC1",
+    "text": "Given valid X-3CX-Base-URL/Client-Id/Client-Secret headers, When calling 3cx_test_connection, Then it returns {status: ok, pbx_fqdn, checked_endpoint}",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_test_connection_tool_reports_ok"]
+  },
+  {
+    "id": "TC2",
+    "ac": "AC2",
+    "text": "Given any one of the three required credential headers is missing, When calling any tool, Then the response is HTTP 401 naming the missing header, not HTTP 500",
+    "type": "auto",
+    "tests": ["tests/test_middleware.py::test_missing_credential_header_returns_401"]
+  },
+  {
+    "id": "TC3",
+    "ac": "AC3",
+    "text": "Given valid credentials, When calling 3cx_list_extensions with a name filter, Then only matching extensions are returned, paginated with count/page/has_more/next_page/offset/next_offset",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_list_extensions_filters_and_paginates"]
+  },
+  {
+    "id": "TC4",
+    "ac": "AC4",
+    "text": "Given valid credentials, When calling 3cx_get_extension with an id that does not exist, Then a not_found error envelope is returned instead of raising",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_get_extension_not_found_envelope"]
+  },
+  {
+    "id": "TC5",
+    "ac": "AC5",
+    "text": "Given valid credentials, When calling 3cx_list_queues then 3cx_get_queue with one of the returned ids, Then the queue directory round-trips the same way as extensions (same pagination and not_found shape)",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_list_and_get_queue"]
+  },
+  {
+    "id": "TC6",
+    "ac": "AC6",
+    "type": "manual",
+    "text": "Active calls are visible through the MCP tool",
+    "steps": [
+      "On a real 3CX PBX, place a live call so at least one active call exists",
+      "Call 3cx_list_active_calls with valid headers for that PBX",
+      "Optionally repeat with a dn filter for the extension on the call"
+    ],
+    "expect": "The response includes the in-progress call (and, with the dn filter, only calls on that extension)",
+    "result": "untested",
+    "evidence": "needs a real 3CX PBX + Client ID/Secret — not available to the design or dev leg; not a blocker per the vendor-mcp-development SOP (\"no test account\" rule). Execute once access is available."
+  },
+  {
+    "id": "TC7",
+    "ac": "AC7",
+    "type": "manual",
+    "text": "Call participants are visible through the MCP tool",
+    "steps": [
+      "With the active call from TC6 still in progress",
+      "Call 3cx_get_call_participants(dn) for the extension on that call"
+    ],
+    "expect": "The response lists the participants of that specific call",
+    "result": "untested",
+    "evidence": "needs a real 3CX PBX + Client ID/Secret — same as TC6, not a blocker."
+  },
+  {
+    "id": "TC8",
+    "ac": "AC8",
+    "type": "manual",
+    "text": "A call can be placed through the MCP tool",
+    "steps": [
+      "Call 3cx_make_call(dn=<a real extension>, destination=<a reachable test number>) with valid headers",
+      "Observe the extension / softphone"
+    ],
+    "expect": "3CX places the call; the tool returns a participant id and a ringing/connected status; the extension is observed ringing or connecting",
+    "result": "untested",
+    "evidence": "needs a real 3CX PBX + Client ID/Secret and a safe destination to call — not available to design or dev leg; not a blocker."
+  },
+  {
+    "id": "TC9",
+    "ac": "AC9",
+    "text": "Given a call can be ended, When calling 3cx_drop_call without confirm: true, Then the tool returns {done: false, message: ...} and does not call the upstream drop endpoint",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_drop_call_requires_confirm"]
+  },
+  {
+    "id": "TC10",
+    "ac": "AC9",
+    "type": "manual",
+    "text": "With confirm: true, the call actually ends on the PBX",
+    "steps": [
+      "Place a test call per TC8",
+      "Call 3cx_drop_call(dn, participant_id, confirm: true)",
+      "Observe the extension / softphone"
+    ],
+    "expect": "The tool returns {done: true}; the call is actually ended on the PBX",
+    "result": "untested",
+    "evidence": "needs a real 3CX PBX + Client ID/Secret — same constraint as TC8, not a blocker."
+  },
+  {
+    "id": "TC11",
+    "ac": "AC10",
+    "text": "Given valid credentials, When calling 3cx_list_call_history and 3cx_list_event_logs with a start/end date range, Then matching historical records are returned, paginated the same way as directory tools",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_call_history_and_event_logs_date_range"]
+  },
+  {
+    "id": "TC12",
+    "ac": "AC11",
+    "text": "Given two interleaved requests with different X-3CX-* header sets (simulating two tenants on the same running container), When both are in flight concurrently, Then neither request's credentials, token, or response data is visible to the other (contextvar isolation, no shared cache)",
+    "type": "auto",
+    "tests": ["tests/test_middleware.py::test_concurrent_requests_do_not_leak_credentials_or_tokens"]
+  },
+  {
+    "id": "TC13",
+    "ac": "AC12",
+    "text": "Given the upstream 3CX API returns 429 or 5xx on a read call, Then the server retries with backoff and eventually returns a retryable upstream_error if still failing; given the same on a write call (3cx_make_call/3cx_drop_call), Then it is not auto-retried",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_read_retries_on_429_and_5xx_write_does_not"]
+  }
+]
