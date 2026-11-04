@@ -1,0 +1,9 @@
+3CX MCP Server
+Copyright 2026 MSPbots.ai
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+"3CX" is a trademark of its respective owner. This project is an independent
+integration that calls 3CX's own publicly documented REST APIs (Configuration
+XAPI and Call Control API); it contains no 3CX source code and is not
+affiliated with or endorsed by 3CX.
