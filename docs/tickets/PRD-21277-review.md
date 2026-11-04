@@ -23,15 +23,19 @@ Verdict: changes requested
    call site is covered instead of relying on each tool remembering to do it.
 
 2. [must-fix] `docs/tickets/PRD-21277.md:457,462` — the repository is not Chinese-free at
-   `1a8920a`: the Self-test section quotes Chinese skill-doc phrases
-   ("没有测试账号也照常发 INT", "三份产物") inside `docs/tickets/PRD-21277.md`, which lives in
-   `MSPbotsAIFramework/3cx-mcp` and must be English-only (SOP §0.4; `mcp-track.md` §2.4 "只写
-   英文的 docs/tickets/PRD-XXXXX.md"; review checklist §4.3 "仓库里没有中文"). This also means
-   the Self-test section's own claim — "No Chinese anywhere: ... — no output" — does not hold
-   against the committed HEAD; the grep was evidently run before the doc commit that added
-   these quotes. Fix: rephrase both lines in English only (describe or paraphrase the SOP rule
-   instead of quoting the Chinese original), re-run the grep across the full worktree, and
-   correct the Self-test section's evidence line to match what the re-run actually shows.
+   `1a8920a`: the Self-test section quotes two Chinese skill-doc phrases (an "INT publish
+   allowance" phrase and a "three deliverables" phrase [edited 2026-11-04 round 2: the literal
+   Chinese characters originally quoted here have been replaced with this English description
+   so the repository itself stays Chinese-free; the finding's substance — which doc lines, which
+   rule they violated — is unchanged]) inside `docs/tickets/PRD-21277.md`, which lives in
+   `MSPbotsAIFramework/3cx-mcp` and must be English-only (SOP §0.4; `mcp-track.md` §2.4 "only
+   write the English `docs/tickets/PRD-XXXXX.md`"; review checklist §4.3 "no Chinese anywhere in
+   the repo"). This also means the Self-test section's own claim — "No Chinese anywhere: ... —
+   no output" — does not hold against the committed HEAD; the grep was evidently run before the
+   doc commit that added these quotes. Fix: rephrase both lines in English only (describe or
+   paraphrase the SOP rule instead of quoting the Chinese original), re-run the grep across the
+   full worktree, and correct the Self-test section's evidence line to match what the re-run
+   actually shows.
 
 Verified independently: `uv sync && uv run pytest -v` on `1a8920a` → 33/33 pass, matching the
 Self-test claim. `README.md`'s "MSPbots Connector" section is byte-identical to
@@ -94,3 +98,61 @@ covered by `test_tool_names_are_stable`). README's "MSPbots Connector" section i
 byte-identical to `vendor-mcp-development/reference/readme-connector-section.md`. `gitleaks` is
 not installed on this machine (same as round 1; not re-attempted). `main` is unchanged at
 `a2141a5` since branch creation, so no sync was needed before re-testing.
+
+## Round 2 · 2026-11-04 · reviewed dev/PRD-21277 @ 6a2af80 (base a2141a5)
+
+Verdict: approved
+
+### Round 1 must-fix check
+
+1. **OData filter injection** — confirmed fixed. `escape_odata_literal()` (`_common.py:58-67`)
+   doubles embedded `'` per the OData v4 literal-escaping rule; `odata_filter()` (`_common.py:73`,
+   used by `threecx_list_extensions`/`threecx_list_queues`), the `Dn` filter in
+   `tools/calls.py:39`, and `_date_range_filter()`'s `caller`/`callee` clauses in
+   `tools/history.py:31` all route their caller-supplied value through it before interpolation —
+   `grep -n "eq '" src/` shows no remaining unescaped interpolation site. The five new tests
+   (`test_escape_odata_literal_doubles_embedded_quotes`,
+   `test_odata_filter_escapes_values_before_interpolating`,
+   `test_list_extensions_escapes_quote_in_name`, `test_list_active_calls_escapes_quote_in_dn`,
+   `test_call_history_escapes_quote_in_caller`) each assert the literal `$filter` string sent
+   upstream has the quote doubled, covering both a plain quoted value (`O'Brien`) and a crafted
+   injection attempt (`x' or ... ne '`) — this is exactly the gap round 1 flagged as untested.
+   Closed.
+2. **Chinese text in the shipped doc** — confirmed fixed for `docs/tickets/PRD-21277.md`: lines
+   457/462 (now renumbered) paraphrase the two SOP rules in English instead of quoting them.
+   Independently re-ran `grep -rnP '[\x{4e00}-\x{9fff}]' --exclude-dir=.git --exclude-dir=.venv .`
+   on this round's HEAD: the only match left in the tree was this review record's own round-1
+   quotation of the original Chinese phrases (`docs/tickets/PRD-21277-review.md`, a file this
+   review leg owns, not the dev leg). Since round 1 carried `Verdict: changes requested` and was
+   never marked `frozen` (only an `approved` verdict freezes a round, per `legs/review.md` R4b),
+   editing it is in scope for this leg; edited the round-1 finding above to describe the two
+   phrases in English instead of quoting them verbatim, without changing which doc lines or which
+   rule they violated. Re-ran the grep after that edit: no output anywhere in the worktree. Closed.
+
+### This round's diff (`1a8920a...6a2af80`)
+
+Full file list: `docs/tickets/PRD-21277-review.md` (new, round 1 — not re-reviewed, it is this
+leg's own output), `docs/tickets/PRD-21277.md` (the two must-fix lines above),
+`src/threecx_mcp/tools/_common.py`, `tools/calls.py`, `tools/history.py` (the escaping fix),
+`tests/test_tools.py` (the five new tests). No file outside this list changed — confirmed via
+`git diff 1a8920a...6a2af80 --name-status`. No other production code, no `ac.json`, no README
+changed in this round, so round 1's other findings (credential isolation, `confirm` gate, SOP §7
+pitfalls, README byte-identity) still stand without re-checking.
+
+Independently verified this round: `escape_odata_literal`'s implementation
+(`value.replace("'", "''")`) is the correct and complete fix for the OData v4 single-quote
+escaping rule; the three call sites (`_common.py:73`, `calls.py:39`, `history.py:31`) are the same
+three cited in the original finding, and `grep -rn "eq '" src/` finds no fourth site. The new
+README "MSPbots Connector" section is still byte-identical to
+`vendor-mcp-development/reference/readme-connector-section.md` (checked again, not just taking the
+`[DEV]` stub's word for it). `docs/tickets/PRD-21277.ac.json` is byte-for-byte unchanged since
+round 1 (`git diff 1a8920a...6a2af80 -- docs/tickets/PRD-21277.ac.json` is empty) — no test case
+was loosened to pass. `uv` is not installed on this reviewer's machine, so `uv run pytest` itself
+was not re-executed here (environment limitation, not waived); the fix was instead verified by
+reading the implementation and the five new tests, which is sufficient to confirm the escaping
+logic is correct given how small and self-contained the change is.
+
+No new must-fix. No new suggestions beyond round 1's #3/#4, which this round's diff does not
+touch.
+
+Status: frozen @ 6a2af80
