@@ -23,6 +23,7 @@ from threecx_mcp import client as client_module
 from threecx_mcp.auth import _credentials_var
 from threecx_mcp.client import ThreeCXCredentials
 from threecx_mcp.server import INSTRUCTIONS, create_mcp_server
+from threecx_mcp.tools._common import escape_odata_literal, odata_filter
 
 CREDS = ThreeCXCredentials("https://pbx.example.com", "client-id", "client-secret")
 TOKEN_RESPONSE = {"access_token": "token-abc", "token_type": "Bearer", "expires_in": 3600}
@@ -55,6 +56,20 @@ def test_tool_names_are_stable(tools):
 
 def test_instructions_are_reasonably_sized():
     assert 0 < len(INSTRUCTIONS) <= 1500
+
+
+# ---- OData filter escaping ----------------------------------------------------
+
+
+def test_escape_odata_literal_doubles_embedded_quotes():
+    assert escape_odata_literal("O'Brien") == "O''Brien"
+    assert escape_odata_literal("no quotes") == "no quotes"
+    assert escape_odata_literal("x' or Number ne '") == "x'' or Number ne ''"
+
+
+def test_odata_filter_escapes_values_before_interpolating():
+    clause = odata_filter(FirstName="O'Brien", Number=None)
+    assert clause == "FirstName eq 'O''Brien'"
 
 
 @pytest.fixture(autouse=True)
@@ -138,6 +153,13 @@ async def test_list_extensions_filters_and_paginates(monkeypatch):
     assert result["items"] == rows
 
 
+async def test_list_extensions_escapes_quote_in_name(monkeypatch):
+    rec = Recorder({"/xapi/v1/Defs": {"value": []}})
+    await _call(monkeypatch, rec, "threecx_list_extensions", {"name": "O'Brien"})
+    params = rec.calls("/xapi/v1/Defs")[0].url.params
+    assert params["$filter"] == "FirstName eq 'O''Brien'"
+
+
 async def test_get_extension_not_found_envelope(monkeypatch):
     rec = Recorder({"/xapi/v1/Defs(999)": lambda r: httpx.Response(404, json={"error": "not found"})})
     result = await _call(monkeypatch, rec, "threecx_get_extension", {"id": "999"})
@@ -165,6 +187,12 @@ async def test_list_active_calls_filters_by_dn(monkeypatch):
     result = await _call(monkeypatch, rec, "threecx_list_active_calls", {"dn": "100"})
     assert result["items"] == [{"Id": 1, "Dn": "100"}]
     assert rec.calls("/xapi/v1/ActiveCalls")[0].url.params["$filter"] == "Dn eq '100'"
+
+
+async def test_list_active_calls_escapes_quote_in_dn(monkeypatch):
+    rec = Recorder({"/xapi/v1/ActiveCalls": {"value": []}})
+    await _call(monkeypatch, rec, "threecx_list_active_calls", {"dn": "x' or Dn ne '"})
+    assert rec.calls("/xapi/v1/ActiveCalls")[0].url.params["$filter"] == "Dn eq 'x'' or Dn ne '''"
 
 
 async def test_get_call_participants(monkeypatch):
@@ -218,6 +246,18 @@ async def test_call_history_and_event_logs_date_range(monkeypatch):
         {"start_date": "2026-11-01T00:00:00Z", "end_date": "2026-11-02T00:00:00Z"},
     )
     assert logs["items"] == [{"EventType": "Login"}]
+
+
+async def test_call_history_escapes_quote_in_caller(monkeypatch):
+    rec = Recorder({"/xapi/v1/CallHistoryView": {"value": []}})
+    await _call(
+        monkeypatch,
+        rec,
+        "threecx_list_call_history",
+        {"start_date": "2026-11-01T00:00:00Z", "end_date": "2026-11-02T00:00:00Z", "caller": "O'Brien"},
+    )
+    params = rec.calls("/xapi/v1/CallHistoryView")[0].url.params
+    assert "CallerID eq 'O''Brien'" in params["$filter"]
 
 
 # ---- retries and error mapping -------------------------------------------------

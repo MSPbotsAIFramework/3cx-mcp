@@ -55,9 +55,22 @@ def compact(values: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in values.items() if v is not None}
 
 
+def escape_odata_literal(value: str) -> str:
+    """Escape a value for embedding in an OData v4 string literal ('...').
+
+    The OData ABNF escapes a single quote inside a string literal by doubling
+    it (`'` -> `''`); every caller-supplied value interpolated into a
+    `$filter` clause must go through this first, or a quote in the value
+    either breaks the clause (e.g. a legitimate name like "O'Brien") or lets
+    a crafted value rewrite the filter's boolean logic against the live PBX
+    (OData filter injection).
+    """
+    return value.replace("'", "''")
+
+
 def odata_filter(**eq: str | None) -> str | None:
     """`field eq 'value'` clauses joined with `and`, skipping unset fields."""
-    clauses = [f"{field} eq '{value}'" for field, value in eq.items() if value]
+    clauses = [f"{field} eq '{escape_odata_literal(value)}'" for field, value in eq.items() if value]
     return " and ".join(clauses) or None
 
 

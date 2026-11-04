@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from ..client import ThreeCXClient
-from ._common import Offset, Page, PageSize, READ_ONLY, ClientFactory, list_page, run_tool
+from ._common import Offset, Page, PageSize, READ_ONLY, ClientFactory, escape_odata_literal, list_page, run_tool
 
 DateStr = Annotated[str, Field(description="ISO 8601 date/time, e.g. '2026-11-01T00:00:00Z'.", min_length=1)]
 Caller = Annotated[str | None, Field(description="Exact caller number.")]
@@ -28,7 +28,7 @@ Callee = Annotated[str | None, Field(description="Exact callee number.")]
 
 def _date_range_filter(start_date: str, end_date: str, **eq: str | None) -> str:
     clauses = [f"SegmentStartTime ge {start_date}", f"SegmentStartTime le {end_date}"]
-    clauses += [f"{field} eq '{value}'" for field, value in eq.items() if value]
+    clauses += [f"{field} eq '{escape_odata_literal(value)}'" for field, value in eq.items() if value]
     return " and ".join(clauses)
 
 

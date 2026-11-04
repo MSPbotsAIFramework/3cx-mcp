@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from ..client import ThreeCXClient
-from ._common import DESTRUCTIVE, READ_ONLY, WRITES, ClientFactory, Confirm, compact, not_confirmed, run_tool
+from ._common import DESTRUCTIVE, READ_ONLY, WRITES, ClientFactory, Confirm, compact, escape_odata_literal, not_confirmed, run_tool
 
 Dn = Annotated[str, Field(description="Extension number (DN), e.g. '100'.", min_length=1)]
 DnFilter = Annotated[str | None, Field(description="Only calls on this extension number (DN).")]
@@ -36,7 +36,7 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         """List currently in-progress calls across the PBX, optionally filtered to one extension (dn)."""
 
         async def action(client: ThreeCXClient) -> dict:
-            filter_clause = f"Dn eq '{dn}'" if dn else None
+            filter_clause = f"Dn eq '{escape_odata_literal(dn)}'" if dn else None
             payload = await client.get_xapi("ActiveCalls", compact({"$filter": filter_clause}))
             items = payload.get("value") if isinstance(payload, dict) else payload
             items = items if isinstance(items, list) else []
